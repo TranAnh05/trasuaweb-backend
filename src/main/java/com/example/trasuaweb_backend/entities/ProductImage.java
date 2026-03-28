@@ -23,7 +23,6 @@ public class ProductImage {
     @Column(name = "sort_order")
     private Integer sortOrder;
 
-    // Quan hệ Many-To-One: Nhiều hình ảnh thuộc về 1 sản phẩm
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;

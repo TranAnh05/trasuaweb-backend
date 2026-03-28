@@ -2,8 +2,11 @@ package com.example.trasuaweb_backend.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "products")
@@ -29,21 +32,37 @@ public class Product {
     @Column(name = "default_image", columnDefinition = "TEXT")
     private String defaultImage;
 
+    // --- CÁC TRƯỜNG THIẾU ĐÃ BỔ SUNG ---
+    @Column(name = "is_featured")
+    private Boolean isFeatured;
+
+    @Column(name = "view_count")
+    private Long viewCount;
+
+    @Column(name = "discount_type", length = 50)
+    private String discountType;
+
+    @Column(name = "discount_value", precision = 10, scale = 2)
+    private BigDecimal discountValue;
+
+    @Column(name = "discount_start_date")
+    private LocalDateTime discountStartDate;
+
+    @Column(name = "discount_end_date")
+    private LocalDateTime discountEndDate;
+    // ------------------------------------
+
     private String status;
 
-    // Liên kết Many-To-One với Category (Nhiều sản phẩm thuộc 1 danh mục)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
-    // Liên kết One-To-Many với ProductVariant (1 sản phẩm có nhiều biến thể size)
-    // orphanRemoval = true: Nếu xóa biến thể khỏi list, DB cũng sẽ xóa dòng đó.
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductVariant> variants;
+    private Set<ProductVariant> variants;
 
-    // Liên kết One-To-Many với ProductImage
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductImage> images;
+    private Set<ProductImage> images;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -55,6 +74,9 @@ public class Product {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (isFeatured == null) isFeatured = false;
+        if (viewCount == null) viewCount = 0L;
+        if (status == null) status = "published";
     }
 
     @PreUpdate

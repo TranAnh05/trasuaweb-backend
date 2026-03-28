@@ -1,6 +1,7 @@
 package com.example.trasuaweb_backend.controllers;
 
 import com.example.trasuaweb_backend.dtos.responses.ApiResponse;
+import com.example.trasuaweb_backend.dtos.responses.ProductDetailResponse;
 import com.example.trasuaweb_backend.dtos.responses.ProductResponse;
 import com.example.trasuaweb_backend.services.IProductService;
 import lombok.RequiredArgsConstructor;
@@ -35,5 +36,16 @@ public class ProductController {
 
         // 3. Trả về HTTP Status 200 OK
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{slug}")
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(@PathVariable String slug) {
+        ProductDetailResponse productDetail = productService.getProductDetailBySlug(slug);
+
+        return ResponseEntity.ok(ApiResponse.<ProductDetailResponse>builder()
+                .status(200)
+                .message("Lấy chi tiết sản phẩm thành công")
+                .data(productDetail)
+                .build());
     }
 }
