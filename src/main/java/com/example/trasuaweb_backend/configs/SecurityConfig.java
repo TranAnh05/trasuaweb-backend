@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -28,12 +29,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable) // Tắt CSRF vì chúng ta làm REST API
                 .authorizeHttpRequests(auth -> auth
                         // Cho phép ai cũng vào được các API đăng ký, đăng nhập
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Cho phép xem sản phẩm, menu thoải mái
-                        .requestMatchers("/api/v1/products/**", "/api/v1/toppings/**").permitAll()
+                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/toppings/**").permitAll()
                         // Còn lại các API khác (sau này làm) thì bắt buộc phải có Token
                         .requestMatchers("/api/v1/users/profile").authenticated()
                         .anyRequest().authenticated()

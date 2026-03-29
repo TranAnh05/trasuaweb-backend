@@ -2,6 +2,7 @@ package com.example.trasuaweb_backend.exceptions;
 
 import com.example.trasuaweb_backend.dtos.responses.ApiResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,6 +31,29 @@ public class GlobalExceptionHandler {
                         .status(400)
                         .message("Dữ liệu đầu vào không hợp lệ")
                         .data(errors)
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException ex) {
+        // Trả về mã 400 (Bad Request) cùng với câu thông báo lỗi
+        return ResponseEntity.badRequest().body(
+                ApiResponse.<Object>builder()
+                        .status(400) // 400 là mã lỗi do client gửi dữ liệu sai/trùng lặp
+                        .message(ex.getMessage()) // Dòng này sẽ moi ra câu "Email này đã được sử dụng!"
+                        .data(null)
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBadCredentialsException(BadCredentialsException ex) {
+        return ResponseEntity.status(401).body(
+                ApiResponse.<Object>builder()
+                        .status(401)
+                        .message("Email hoặc mật khẩu không chính xác!")
+                        .data(null)
                         .build()
         );
     }
