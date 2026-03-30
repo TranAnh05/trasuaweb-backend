@@ -35,7 +35,7 @@ public class SecurityConfig {
                         // Cho phép ai cũng vào được các API đăng ký, đăng nhập
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Cho phép xem sản phẩm, menu thoải mái
-                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/toppings/**").permitAll()
+                        .requestMatchers("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/toppings/**", "/api/v1/carts/**").permitAll()
                         // Còn lại các API khác (sau này làm) thì bắt buộc phải có Token
                         .requestMatchers("/api/v1/users/profile").authenticated()
                         .anyRequest().authenticated()
