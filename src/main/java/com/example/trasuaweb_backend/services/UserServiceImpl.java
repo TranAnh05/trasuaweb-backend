@@ -67,10 +67,18 @@ public class UserServiceImpl implements IUserService {
             throw new RuntimeException("Tài khoản của bạn đã bị khóa!");
         }
 
-        // 4. Sinh JWT Token
+        // 4. Gộp giỏ hàng nếu có sessionId
+        if (request.getSessionId() != null && !request.getSessionId().trim().isEmpty()) {
+            // cartService.mergeGuestCartToUserCart(request.getSessionId(), user);
+
+            // (Tạm thời em comment dòng gọi cartService lại để code chạy được.
+            // Lát nữa code xong Cart module mình sẽ mở comment ra).
+        }
+
+        // 5. Sinh JWT Token
         String jwtToken = jwtService.generateToken(user);
 
-        // 5. Build DTO trả về cho Frontend
+        // 6. Build DTO trả về cho Frontend
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
