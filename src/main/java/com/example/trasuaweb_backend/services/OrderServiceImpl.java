@@ -32,6 +32,8 @@ public class OrderServiceImpl implements IOrderService {
             throw new RuntimeException("Giỏ hàng của bạn đang trống hoặc không hợp lệ!");
         }
 
+        BigDecimal shippingFee = new BigDecimal("15000");
+
         // 2. KHỞI TẠO ĐƠN HÀNG
         Order order = Order.builder()
                 .orderNo("ORD-" + System.currentTimeMillis()) // Mã đơn hàng tạm thời
@@ -43,7 +45,9 @@ public class OrderServiceImpl implements IOrderService {
                 .internalNote(request.getInternalNote())
                 .orderStatus("PENDING")
                 .payStatus("UNPAID")
+                .shippingFee(shippingFee)
                 .orderItems(new ArrayList<>())
+                .sessionId(request.getSessionId())
                 .build();
 
         // Nếu là User đã đăng nhập, gắn ID của User vào đơn hàng
@@ -101,8 +105,9 @@ public class OrderServiceImpl implements IOrderService {
             order.getOrderItems().add(orderItem);
         }
 
-        // Tạm thời phí ship = 0, discount = 0
-        order.setTotalAmount(totalAmount);
+        BigDecimal finalTotal = totalAmount.add(shippingFee);
+        // Tạm thời discount = 0
+        order.setTotalAmount(finalTotal);
 
         // 4. LƯU ĐƠN HÀNG & XÓA GIỎ HÀNG
         Order savedOrder = orderRepository.save(order);
@@ -175,5 +180,82 @@ public class OrderServiceImpl implements IOrderService {
                 .createdAt(order.getCreatedAt())
                 .items(itemResponses)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderDetails(String orderNo, String sessionId, String userEmail) {
+        // 1. Tìm đơn hàng dưới DB
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderNo));
+
+        // 2. KIỂM TRA BẢO MẬT (CHỐNG LỖI IDOR)
+        if (order.getUser() != null) {
+            // Đơn hàng này của User đã đăng nhập -> Bắt buộc phải có Token khớp email
+            if (userEmail == null || !order.getUser().getEmail().equals(userEmail)) {
+                // Trong thực tế nên ném ra AccessDeniedException (Lỗi 403)
+                throw new RuntimeException("Truy cập bị từ chối: Bạn không có quyền xem đơn hàng này!");
+            }
+        } else {
+            // Đơn hàng này của Khách vãng lai -> Bắt buộc phải khớp Session ID dưới LocalStorage của họ
+            if (sessionId == null || !sessionId.equals(order.getSessionId())) {
+                throw new RuntimeException("Truy cập bị từ chối: Phiên làm việc không hợp lệ hoặc đã hết hạn!");
+            }
+        }
+
+        // 3. Nếu qua được bài kiểm tra, map ra DTO và trả về
+        return mapToOrderResponse(order);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getMyOrders(String userEmail) {
+        // 1. Tìm User từ Email
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        // 2. Lấy danh sách đơn hàng của User đó
+        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+
+        // 3. Map từ Entity sang DTO để trả về
+        return orders.stream()
+                .map(this::mapToOrderResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse trackOrder(String orderNo, String phone) {
+        // 1. Tìm đơn hàng bằng cả 2 lớp khóa (Mã đơn + SĐT)
+        Order order = orderRepository.findByOrderNoAndCustomerPhone(orderNo, phone)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng hoặc số điện thoại không khớp!"));
+
+        // 2. Chuyển Entity sang DTO
+        OrderResponse response = mapToOrderResponse(order);
+
+        // 3. Che mờ dữ liệu nhạy cảm (Data Masking) bảo vệ quyền riêng tư
+        response.setShippingAddress(maskAddress(response.getShippingAddress()));
+
+        if (response.getCustomerEmail() != null && !response.getCustomerEmail().isEmpty()) {
+            response.setCustomerEmail(maskEmail(response.getCustomerEmail()));
+        }
+
+        return response;
+    }
+
+    // ==========================================================
+    // HÀM BỔ TRỢ: CHE MỜ DỮ LIỆU (DATA MASKING)
+    // ==========================================================
+    private String maskAddress(String address) {
+        if (address == null || address.length() < 10) return "***";
+        // Giữ lại 15 ký tự đầu (ví dụ: "123 Đường ABC..."), phần còn lại biến thành dấu *
+        return address.substring(0, 15) + " ***";
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf("@");
+        if (atIndex <= 1) return email;
+        // ví dụ: v****h@email.com
+        return email.charAt(0) + "****" + email.substring(atIndex - 1);
     }
 }
