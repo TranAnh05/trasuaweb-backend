@@ -118,6 +118,26 @@ public class CartServiceImpl implements ICartService{
         return true;
     }
 
+    private boolean isMatchingCartItem(CartItem item1, CartItem item2) {
+        if (!item1.getVariant().getId().equals(item2.getVariant().getId())) {
+            return false;
+        }
+
+        List<CartItemTopping> top1 = item1.getToppings() == null ? new ArrayList<>() : item1.getToppings();
+        List<CartItemTopping> top2 = item2.getToppings() == null ? new ArrayList<>() : item2.getToppings();
+
+        if (top1.size() != top2.size()) return false;
+
+        for (CartItemTopping t2 : top2) {
+            boolean hasMatch = top1.stream().anyMatch(t1 ->
+                    t1.getTopping().getId().equals(t2.getTopping().getId()) &&
+                            t1.getQuantity().equals(t2.getQuantity())
+            );
+            if (!hasMatch) return false;
+        }
+        return true;
+    }
+
     // Hàm lấy giỏ hàng hiện tại hoặc tạo mới nếu chưa có
     private Cart getOrCreateCart(String sessionId, String userEmail) {
         if (userEmail != null) {
@@ -136,14 +156,65 @@ public class CartServiceImpl implements ICartService{
         }
     }
 
+    @Transactional
+    protected void mergeCart(String sessionId, User user) {
+        // 1. Tìm giỏ hàng của Khách vãng lai
+        Optional<Cart> guestCartOpt = cartRepository.findBySessionId(sessionId);
+        if (guestCartOpt.isEmpty()) return; // Không có giỏ vãng lai thì thôi
+
+        Cart guestCart = guestCartOpt.get();
+        if (guestCart.getCartItems() == null || guestCart.getCartItems().isEmpty()) {
+            // Giỏ vãng lai rỗng -> Xóa luôn cho sạch Database
+            cartRepository.delete(guestCart);
+            return;
+        }
+
+        // 2. Lấy hoặc tạo giỏ hàng chính thức của User
+        Cart userCart = cartRepository.findByUserId(user.getId())
+                .orElseGet(() -> cartRepository.save(Cart.builder().user(user).build()));
+
+        if (userCart.getCartItems() == null) {
+            userCart.setCartItems(new ArrayList<>());
+        }
+
+        // 3. Tiến hành chuyển đồ từ Giỏ Guest sang Giỏ User
+        for (CartItem guestItem : guestCart.getCartItems()) {
+            Optional<CartItem> existingItemOpt = userCart.getCartItems().stream()
+                    .filter(item -> isMatchingCartItem(item, guestItem))
+                    .findFirst();
+
+            if (existingItemOpt.isPresent()) {
+                // NẾU TRÙNG: Cộng dồn số lượng
+                CartItem existingItem = existingItemOpt.get();
+                existingItem.setQuantity(existingItem.getQuantity() + guestItem.getQuantity());
+            } else {
+                // NẾU CHƯA CÓ: Đổi chủ sở hữu của món hàng sang User Cart
+                guestItem.setCart(userCart);
+                userCart.getCartItems().add(guestItem);
+            }
+        }
+
+        // 4. [TRÁNH BẪY HIBERNATE]: Phải bứt các món hàng ra khỏi Giỏ Guest trước khi xóa Giỏ Guest.
+        // Nếu không làm bước này, khi xóa Giỏ Guest, Hibernate sẽ xóa sạch luôn các món hàng vừa chuyển đi!
+        guestCart.getCartItems().clear();
+
+        // 5. Lưu Giỏ User và Xóa Giỏ Guest
+        cartRepository.save(userCart);
+        cartRepository.delete(guestCart);
+    }
+
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CartResponse getCart(String sessionId, String userEmail) {
-        Cart cart;
+        Cart cart = null;
 
         // 1. Tìm giỏ hàng
         if (userEmail != null) {
             User user = userRepository.findByEmail(userEmail).orElseThrow();
+            // Nếu Frontend gửi lên cả Token (có userEmail) VÀ có sessionId -> Chạy thuật toán gộp!
+            if (sessionId != null && !sessionId.trim().isEmpty()) {
+                mergeCart(sessionId, user);
+            }
             cart = cartRepository.findByUserId(user.getId()).orElse(null);
         } else {
             cart = cartRepository.findBySessionId(sessionId).orElse(null);
