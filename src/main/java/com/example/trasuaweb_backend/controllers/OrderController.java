@@ -11,6 +11,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -49,4 +51,64 @@ public class OrderController {
     // @GetMapping("/{orderNo}") -> Lấy chi tiết 1 đơn hàng để hiển thị trang Cảm ơn
     // @GetMapping("/my-orders") -> Lấy danh sách lịch sử mua hàng của User
     // @PutMapping("/{orderNo}/cancel") -> Khách hàng tự hủy đơn khi đang chờ xác nhận
+
+    @GetMapping("/{orderNo}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderDetails(
+            @PathVariable String orderNo,
+            @RequestParam(required = false) String sessionId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        // Lấy email từ Token (nếu có)
+        String userEmail = userDetails != null ? userDetails.getUsername() : null;
+
+        // Gọi Service xử lý
+        OrderResponse orderResponse = orderService.getOrderDetails(orderNo, sessionId, userEmail);
+
+        return ResponseEntity.ok(
+                ApiResponse.<OrderResponse>builder()
+                        .status(200)
+                        .message("Lấy chi tiết đơn hàng thành công")
+                        .data(orderResponse)
+                        .build()
+        );
+    }
+
+    @GetMapping("/my-orders")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        List<OrderResponse> orders = orderService.getMyOrders(userDetails.getUsername());
+
+        return ResponseEntity.ok(
+                ApiResponse.<List<OrderResponse>>builder()
+                        .status(200)
+                        .message("Lấy lịch sử đơn hàng thành công")
+                        .data(orders)
+                        .build()
+        );
+    }
+
+    /**
+     * API Tra cứu đơn hàng dành cho Khách vãng lai (Xác thực bằng SĐT)
+     */
+    @GetMapping("/track")
+    public ResponseEntity<ApiResponse<OrderResponse>> trackOrder(
+            @RequestParam String orderNo,
+            @RequestParam String phone
+    ) {
+        // Gọi Service để xử lý tra cứu
+        OrderResponse orderResponse = orderService.trackOrder(orderNo, phone);
+
+        return ResponseEntity.ok(
+                ApiResponse.<OrderResponse>builder()
+                        .status(200)
+                        .message("Tra cứu đơn hàng thành công")
+                        .data(orderResponse)
+                        .build()
+        );
+    }
 }

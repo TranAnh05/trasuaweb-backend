@@ -66,6 +66,8 @@ public class Order {
     @Column(name = "internal_note", columnDefinition = "TEXT")
     private String internalNote; // Ghi chú của khách hàng
 
+    @Column(name = "session_id", length = 255)
+    private String sessionId;
     // ==========================================
     // QUAN HỆ VỚI ORDER ITEMS (CỰC KỲ QUAN TRỌNG)
     // ==========================================
