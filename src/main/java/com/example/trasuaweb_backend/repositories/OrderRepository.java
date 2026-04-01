@@ -1,6 +1,8 @@
 package com.example.trasuaweb_backend.repositories;
 
 import com.example.trasuaweb_backend.entities.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,4 +18,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
     // Tìm đơn hàng khớp chính xác cả Mã đơn và Số điện thoại
     Optional<Order> findByOrderNoAndCustomerPhone(String orderNo, String customerPhone);
+
+    // Lấy tất cả đơn hàng, phân trang và sắp xếp mặc định (theo Pageable)
+    Page<Order> findAll(Pageable pageable);
+
+    // Lấy đơn hàng theo trạng thái (Dùng cho các Tab: Đơn mới, Đang giao...)
+    Page<Order> findByOrderStatus(String orderStatus, Pageable pageable);
 }
