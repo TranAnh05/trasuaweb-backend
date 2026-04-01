@@ -3,6 +3,7 @@ package com.example.trasuaweb_backend.controllers;
 import com.example.trasuaweb_backend.dtos.requests.CheckoutRequest;
 import com.example.trasuaweb_backend.dtos.responses.ApiResponse;
 import com.example.trasuaweb_backend.dtos.responses.OrderResponse;
+import com.example.trasuaweb_backend.dtos.responses.PageResponse;
 import com.example.trasuaweb_backend.services.IOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -108,6 +109,40 @@ public class OrderController {
                         .status(200)
                         .message("Tra cứu đơn hàng thành công")
                         .data(orderResponse)
+                        .build()
+        );
+    }
+
+    @GetMapping("/admin/all")
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getAllOrdersForAdmin(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false, defaultValue = "ALL") String status
+    ) {
+        PageResponse<OrderResponse> response = orderService.getAllOrdersForAdmin(page, limit, status);
+
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<OrderResponse>>builder()
+                        .status(200)
+                        .message("Lấy danh sách đơn hàng thành công")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @PutMapping("/admin/{orderId}/status")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
+            @PathVariable Long orderId,
+            @RequestParam String status,
+            @RequestParam(required = false) String cancelReason
+    ) {
+        OrderResponse updatedOrder = orderService.updateOrderStatus(orderId, status, cancelReason);
+
+        return ResponseEntity.ok(
+                ApiResponse.<OrderResponse>builder()
+                        .status(200)
+                        .message("Cập nhật trạng thái đơn hàng thành công")
+                        .data(updatedOrder)
                         .build()
         );
     }

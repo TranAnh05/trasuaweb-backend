@@ -4,17 +4,23 @@ import com.example.trasuaweb_backend.dtos.requests.CheckoutRequest;
 import com.example.trasuaweb_backend.dtos.responses.OrderItemResponse;
 import com.example.trasuaweb_backend.dtos.responses.OrderItemToppingResponse;
 import com.example.trasuaweb_backend.dtos.responses.OrderResponse;
+import com.example.trasuaweb_backend.dtos.responses.PageResponse;
 import com.example.trasuaweb_backend.entities.*;
 import com.example.trasuaweb_backend.repositories.CartRepository;
 import com.example.trasuaweb_backend.repositories.OrderRepository;
 import com.example.trasuaweb_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -257,5 +263,70 @@ public class OrderServiceImpl implements IOrderService {
         if (atIndex <= 1) return email;
         // ví dụ: v****h@email.com
         return email.charAt(0) + "****" + email.substring(atIndex - 1);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getAllOrdersForAdmin(int page, int size, String status) {
+        // 1. Tạo đối tượng Pageable (Trang bắt đầu từ 0 trong Spring Data, nên phải lấy page - 1)
+        // Sắp xếp giảm dần theo ngày tạo (Mới nhất lên đầu)
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+
+        Page<Order> orderPage;
+
+        // 2. Kiểm tra xem có yêu cầu lọc theo trạng thái không
+        if (status != null && !status.trim().isEmpty() && !status.equalsIgnoreCase("ALL")) {
+            orderPage = orderRepository.findByOrderStatus(status, pageable);
+        } else {
+            // Nếu không truyền status hoặc status = "ALL", lấy toàn bộ
+            orderPage = orderRepository.findAll(pageable);
+        }
+
+        // 3. Chuyển Entity sang DTO
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::mapToOrderResponse) // Gọi lại hàm map cũ em đã viết
+                .collect(Collectors.toList());
+
+        // 4. Đóng gói vào PageResponse
+        return PageResponse.<OrderResponse>builder()
+                .currentPage(page)
+                .pageSize(orderPage.getSize())
+                .totalPages(orderPage.getTotalPages())
+                .totalElements(orderPage.getTotalElements())
+                .content(content)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(Long orderId, String newStatus, String cancelReason) {
+        // 1. Tìm đơn hàng
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        String currentStatus = order.getOrderStatus();
+        newStatus = newStatus.toUpperCase();
+
+        // 2. Validate logic chuyển trạng thái (State Machine)
+        if (currentStatus.equals("COMPLETED") || currentStatus.equals("CANCELLED")) {
+            throw new RuntimeException("Đơn hàng đã hoàn tất hoặc đã hủy, không thể thay đổi trạng thái!");
+        }
+
+        // Nếu chuyển sang CANCELLED thì bắt buộc phải có lý do
+        if (newStatus.equals("CANCELLED")) {
+            if (cancelReason == null || cancelReason.trim().isEmpty()) {
+                throw new RuntimeException("Vui lòng nhập lý do hủy đơn hàng!");
+            }
+            order.setCancelReason(cancelReason);
+        }
+
+        // 3. Cập nhật trạng thái
+        order.setOrderStatus(newStatus);
+
+        // 4. Lưu vào Database
+        Order updatedOrder = orderRepository.save(order);
+
+        // 5. Trả về DTO
+        return mapToOrderResponse(updatedOrder);
     }
 }

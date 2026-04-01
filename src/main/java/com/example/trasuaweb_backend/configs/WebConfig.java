@@ -11,7 +11,10 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**") // 1. Chỉ áp dụng CORS cho các route API
                 // 2. Chỉ định rõ domain của Frontend (React thường chạy port 3000 hoặc Vite port 5173)
-                .allowedOrigins("http://localhost:3000", "http://localhost:5173")
+                .allowedOrigins(
+                        "http://localhost:3000", // Cổng của Client
+                        "http://localhost:3001"  // Cổng của Admin
+                )
                 // 3. Các HTTP Methods được phép đi qua
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 // 4. Cho phép Frontend gửi lên các Header tùy chỉnh (rất quan trọng khi gửi JWT Token)
